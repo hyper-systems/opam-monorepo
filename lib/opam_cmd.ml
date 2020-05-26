@@ -132,11 +132,10 @@ let classify_package ~package ~dev_repo ~archive () =
             (kind, tag)
         | x -> (x, None) )
 
-let get_opam_depexts ~local_opam_repo { name; version } =
+let get_opam_depexts ~local_opam_repo { Types.Opam.package = { name; version }; path; _ } =
   let version = match version with None -> "dev" | Some v -> v in
   let opam_file =
-    let local_file = name ^ ".opam" in
-    if Sys.file_exists local_file then Fpath.v local_file
+    if Sys.file_exists path then Fpath.v path
     else Fpath.(local_opam_repo / "packages" / name / (name ^ "." ^ version) / "opam")
   in
   Bos.OS.File.read opam_file >>| fun opam_contents ->
@@ -151,8 +150,9 @@ let get_opam_info ~opam_repo ~root_packages packages =
         match version with None -> failwith "must have package version" | Some v -> v
       in
       let opam_file =
-        if List.exists (fun p -> p.name = name) root_packages then Fpath.v (name ^ ".opam")
-        else Fpath.(opam_repo / "packages" / name / (name ^ "." ^ version) / "opam")
+        match List.find_opt (fun (_, p) -> p.name = name) root_packages with
+        | Some (path, _) -> Fpath.v path
+        | None -> Fpath.(opam_repo / "packages" / name / (name ^ "." ^ version) / "opam")
       in
       Logs.info (fun l -> l "processing %a" Fpath.pp opam_file);
       let open OpamParserTypes in
@@ -203,7 +203,7 @@ let get_opam_info ~opam_repo ~root_packages packages =
             pkg pp_repo dev_repo
             Fmt.(option string)
             tag);
-      { package = pkg; dev_repo; tag; is_dune })
+      { package = pkg; dev_repo; tag; is_dune; path = Fpath.to_string opam_file })
     packages
   |> fun v -> Ok v
 
@@ -229,16 +229,17 @@ let calculate_opam ~config ~local_opam_repo =
   >>| List.map OpamPackage.to_string
   >>| List.map split_opam_name_and_version
   >>= fun deps ->
+  let root_packages_without_path = List.map snd root_packages in
   Logs.app (fun l ->
       l "%aFound %a opam dependencies for %a." pp_header header
         Fmt.(styled `Green int)
         (List.length deps)
         Fmt.(list ~sep:(unit " ") Styled_pp.package)
-        root_packages);
+        root_packages_without_path);
   Logs.info (fun l ->
       l "The dependencies for %a are: %a"
         Fmt.(list ~sep:(unit ",@ ") pp_package)
-        root_packages
+        root_packages_without_path
         Fmt.(list ~sep:(unit ",@ ") pp_package)
         deps);
   Logs.app (fun l ->
@@ -280,7 +281,7 @@ let choose_root_packages ~local_packages =
   | [] ->
       R.error_msg
         "Cannot find any packages to vendor.\n\
-         Either create some *.opam files in the local repository, or specify them manually via \
+         Either create some *.opam files in the repository, or specify them manually via \
          'duniverse opam <packages>'."
   | local_packages ->
       Logs.app (fun l ->

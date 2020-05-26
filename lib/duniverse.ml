@@ -117,9 +117,9 @@ module Deps = struct
       match entry with
       | { dev_repo = `Virtual; _ } | { dev_repo = `Error _; _ } -> Ok None
       | { is_dune = false; package = { name; version }; _ } -> Ok (Some (Opam { name; version }))
-      | { is_dune = true; dev_repo = `Git upstream; tag = Some ref; package = { name; version } } ->
+      | { is_dune = true; dev_repo = `Git upstream; tag = Some ref; package = { name; version }; path = _ } ->
           Ok (Some (Source { opam = { name; version }; upstream; ref }))
-      | { is_dune = true; dev_repo = `Git upstream; tag = None; package = { name; version } } ->
+      | { is_dune = true; dev_repo = `Git upstream; tag = None; package = { name; version }; path = _ } ->
           get_default_branch upstream >>= fun ref ->
           Ok (Some (Source { opam = { name; version }; upstream; ref }))
   end
@@ -170,7 +170,7 @@ module Config = struct
 
   type t = {
     version: string;
-    root_packages : Types.Opam.package list;
+    root_packages : (string * Types.Opam.package) list;
     pull_mode : pull_mode; [@default Source]
     opam_repo : Uri_sexp.t;
         [@default Uri.of_string Config.duniverse_opam_repo] [@sexp_drop_default.sexp]

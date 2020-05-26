@@ -131,33 +131,29 @@ let pp_sel f pkg = Fmt.string f (OpamPackage.to_string pkg)
 
 let ocaml_name = OpamPackage.Name.of_string "ocaml"
 
-let solve ~opam_repo ~opam_files src ~variants =
-  let src = Fpath.to_string src in
+let solve ~opam_repo ~root_packages ~variants =
   let opam_repository = Fpath.to_string opam_repo in
   let pkgs =
-    opam_files
-    |> List.map (fun path ->
+    root_packages
+    |> List.map (fun (path, package) ->
            let name =
-             Filename.basename path |> Filename.chop_extension |> OpamPackage.Name.of_string
+             OpamPackage.Name.of_string (package.Types.Opam.name)
            in
            let version =
              let dir = Filename.dirname path in
-             if dir = "." then dev
-             else
-               match OpamPackage.of_string_opt dir with
-               | Some { OpamPackage.version; _ } -> version
-               | None -> dev
+             match OpamPackage.of_string_opt dir with
+             | Some { OpamPackage.version; _ } -> version
+             | None -> dev
            in
            (OpamPackage.create name version, path))
   in
   let root_pkgs =
     pkgs
-    |> List.filter_map (fun (pkg, path) ->
-           if Filename.dirname path = "." then Some (OpamPackage.name pkg) else None)
+    |> List.map (fun (pkg, _path) -> (OpamPackage.name pkg))
   in
   let pins =
     pkgs
-    |> List.map (fun (pkg, path) -> (OpamPackage.name pkg, (OpamPackage.version pkg, src / path)))
+    |> List.map (fun (pkg, path) -> (OpamPackage.name pkg, (OpamPackage.version pkg, path)))
     |> OpamPackage.Name.Map.of_list
   in
   (* let pp_name f name = Fmt.string f (OpamPackage.Name.to_string name) in *)
@@ -192,8 +188,6 @@ let solve ~opam_repo ~opam_files src ~variants =
              Lwt.return_none)
 
 let calculate_t ~opam_repo ~root_packages =
-  let opam_files = List.map (fun { Types.Opam.name; _ } -> name ^ ".opam") root_packages in
-  let src = Fpath.v "." in
   let module OR = Osrelease in
   let variants =
     [
@@ -207,7 +201,7 @@ let calculate_t ~opam_repo ~root_packages =
     ]
   in
   let open Lwt.Infix in
-  solve ~opam_repo ~opam_files src ~variants >>= function
+  solve ~opam_repo ~root_packages ~variants >>= function
   | [ s ] -> Lwt.return s.packages
   | [] -> Lwt.fail (Failure "no results from solver")
   | _ -> Lwt.fail (Failure "too many results from solver")

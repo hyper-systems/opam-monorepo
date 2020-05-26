@@ -30,6 +30,17 @@ module Arg = struct
       (fun x -> `Duniverse_repos x)
       Term.(non_empty_list_opt $ Arg.(value & pos_all string [] & info ~doc ~docv []))
 
+  let opam_files =
+    let open Cmdliner in
+    let docv = "OPAM_FILES" in
+    let doc =
+      "The list of $(docv) used to create your duniverse. If none is provided, all opam \
+       files in the root directory will be used."
+    in
+    named
+      (fun x -> `Opam_files x)
+      Term.(non_empty_list_opt $ Arg.(value & pos_all string [] & info ~doc ~docv []))
+
   let cache_env_var ?(windows_only = false) ~priority ~extra_path ~var () =
     let windows_only = if windows_only then " (only on Windows)" else "" in
     let doc =

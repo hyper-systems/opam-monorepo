@@ -26,6 +26,8 @@ module Arg : sig
   (** CLI arguments consisting of the list of source deps repo to process. If [None],
       the whole duniverse should be processed. If [Some l] then [l] is non empty. *)
 
+  val opam_files : [ `Opam_files of string list option ] Cmdliner.Term.t
+
   val caches : Cmdliner.Term.env_info list
   (** Cache selection environment variables for use in terms. *)
 

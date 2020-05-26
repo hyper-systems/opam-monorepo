@@ -22,8 +22,8 @@ module Testable = struct
 end
 
 let entry_factory ?(package = { Duniverse_lib.Types.Opam.name = ""; version = None })
-    ?(dev_repo = `Virtual) ?tag ?(is_dune = false) () =
-  { Duniverse_lib.Types.Opam.package; dev_repo; tag; is_dune }
+    ?(dev_repo = `Virtual) ?tag ?(is_dune = false) ?(path="") () =
+  { Duniverse_lib.Types.Opam.package; dev_repo; tag; is_dune; path }
 
 module Deps = struct
   module Source = struct

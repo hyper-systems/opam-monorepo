@@ -1,5 +1,4 @@
 open Duniverse_lib
-open Duniverse_lib.Types
 
 let build_config ~local_packages ~pull_mode ~opam_repo =
   let open Rresult.R.Infix in
@@ -13,7 +12,12 @@ let build_config ~local_packages ~pull_mode ~opam_repo =
   in
   let version = "1" in
   let root_packages =
-    List.map Opam_cmd.split_opam_name_and_version root_packages |> Opam.sort_uniq
+    root_packages
+    |> List.sort_uniq String.compare
+    |> List.map (fun path ->
+        let name = Filename.(remove_extension (basename path)) in
+        let package = { Types.Opam.name; version = None } in
+        (path, package))
   in
   Ok { Duniverse.Config.version; root_packages; pull_mode; ocaml_compilers; opam_repo }
 
@@ -31,8 +35,8 @@ let resolve_ref deps =
   let resolve_ref ~upstream ~ref = Exec.git_resolve ~remote:upstream ~ref in
   Duniverse.Deps.resolve ~resolve_ref deps
 
-let run (`Repo repo) 
-    (`Opam_repo opam_repo) (`Pull_mode pull_mode) () =
+let run (`Repo repo)
+    (`Opam_repo opam_repo) (`Pull_mode pull_mode) (`Opam_files opam_files) () =
   let open Rresult.R.Infix in
   (match Cloner.get_cache_dir () with None -> Ok (Fpath.v ".") | Some t -> t) >>= fun cache_dir ->
   let local_opam_repo = Fpath.(cache_dir / "opam-repository.git") in
@@ -40,22 +44,24 @@ let run (`Repo repo)
   let opam_repo_branch = match Uri.fragment opam_repo with None -> "master" | Some b -> b in
   Exec.git_clone_or_pull ~remote:opam_repo_url ~branch:opam_repo_branch ~output_dir:local_opam_repo
   >>= fun () ->
-  Opam_cmd.find_local_opam_packages repo >>= fun local_packages ->
+  let opam_files =
+    match opam_files with
+    | Some opam_files -> Ok opam_files
+    | None -> Opam_cmd.find_local_opam_packages repo
+  in
+  opam_files >>= fun local_packages ->
   build_config ~local_packages ~pull_mode ~opam_repo
   >>= fun config ->
   Opam_cmd.calculate_opam ~config ~local_opam_repo >>= fun packages ->
   Opam_cmd.report_packages_stats packages;
-  let depext_pkgs =
-    config.root_packages @ List.map (fun { Types.Opam.package; _ } -> package) packages
-  in
-  compute_depexts ~local_opam_repo depext_pkgs
+  compute_depexts ~local_opam_repo packages
   >>= fun depexts ->
   Common.Logs.app (fun l ->
       l "Recording %a depext formulae for %a packages."
         Fmt.(styled `Green int)
         (List.length depexts)
         Fmt.(styled `Green int)
-        (List.length depext_pkgs));
+        (List.length packages));
   List.iter (fun (k, v) -> Logs.info (fun l -> l "depext %s %s" (String.concat "," k) v)) depexts;
   Common.Logs.app (fun l -> l "Calculating Git repositories to vendor source code.");
   compute_deps ~opam_entries:packages >>= fun unresolved_deps ->
@@ -110,6 +116,6 @@ let term =
   let open Term in
   term_result
     ( const run $ Common.Arg.repo $ opam_repo $ pull_mode
-    $ Common.Arg.setup_logs () )
+    $ Common.Arg.opam_files $ Common.Arg.setup_logs () )
 
 let cmd = (term, info)

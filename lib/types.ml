@@ -46,6 +46,7 @@ module Opam = struct
     dev_repo : repo;
     tag : string option; [@default None] [@sexp_drop_default.sexp]
     is_dune : bool; [@default true] [@sexp_drop_default.sexp]
+    path : string;
   }
   [@@deriving sexp]
 
@@ -56,7 +57,7 @@ module Opam = struct
   }
   [@@deriving sexp]
 
-  let pp_package ppf { name; version } =
+  let pp_package ppf { name; version; _ } =
     match version with None -> Fmt.pf ppf "%s" name | Some v -> Fmt.pf ppf "%s.%s" name v
 
   let string_of_package pkg = Fmt.strf "%a" pp_package pkg
