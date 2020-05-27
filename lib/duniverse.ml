@@ -179,7 +179,12 @@ module Config = struct
   [@@deriving sexp] [@@sexp.allow_extra_fields]
 end
 
-type t = { config : Config.t; deps : resolved Deps.t; depexts : Depexts.t } [@@deriving sexp]
+type t = {
+  config : Config.t;
+  pins : Types.Opam.pin list [@default []] [@sexp_drop_default.sexp];
+  deps : resolved Deps.t;
+  depexts : Depexts.t
+} [@@deriving sexp]
 
 let load ~file = Persist.load_sexp "duniverse" t_of_sexp file
 

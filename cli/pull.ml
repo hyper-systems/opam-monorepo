@@ -147,7 +147,7 @@ let run (`Yes yes) (`No_cache no_cache) (`Repo repo) (`Duniverse_repos duniverse
   let open Result.O in
   let duniverse_file = Fpath.(repo // Config.duniverse_file) in
   Duniverse.load ~file:duniverse_file >>= function
-  | { deps = { duniverse = []; _ }; _ } ->
+  | { deps = { duniverse = []; _ }; pins = []; _ } ->
       Common.Logs.app (fun l -> l "No dependencies to pull, there's nothing to be done here!");
       Ok ()
   | { deps = { duniverse; _ }; config; _ } ->

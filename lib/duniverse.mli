@@ -98,7 +98,12 @@ module Config : sig
   [@@deriving sexp]
 end
 
-type t = { config : Config.t; deps : resolved Deps.t; depexts : Depexts.t } [@@deriving sexp]
+type t = {
+  config : Config.t;
+  pins : Types.Opam.pin list;
+  deps : resolved Deps.t;
+  depexts : Depexts.t
+} [@@deriving sexp]
 
 val load : file:Fpath.t -> (t, [> `Msg of string ]) result
 

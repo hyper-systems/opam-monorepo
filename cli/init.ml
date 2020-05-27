@@ -1,6 +1,15 @@
 open Duniverse_lib
 open Duniverse_lib.Types
 
+
+let read_pins duniverse =
+  match duniverse with
+  | { Duniverse.pins = []; _ } ->
+      Common.Logs.app (fun l -> l "No pinned packages found.");
+      [{Types.Opam.pin = "my_pin";
+        url = Some "git+https://github.com/aaa/bbb.git"; tag = Some "master" }]
+  | { pins; _ } -> pins
+
 let build_config ~local_packages ~pull_mode ~opam_repo =
   let open Rresult.R.Infix in
   Opam_cmd.choose_root_packages ~local_packages >>= fun root_packages ->
@@ -31,7 +40,7 @@ let resolve_ref deps =
   let resolve_ref ~upstream ~ref = Exec.git_resolve ~remote:upstream ~ref in
   Duniverse.Deps.resolve ~resolve_ref deps
 
-let run (`Repo repo) 
+let run (`Repo repo)
     (`Opam_repo opam_repo) (`Pull_mode pull_mode) () =
   let open Rresult.R.Infix in
   (match Cloner.get_cache_dir () with None -> Ok (Fpath.v ".") | Some t -> t) >>= fun cache_dir ->
@@ -43,6 +52,11 @@ let run (`Repo repo)
   Opam_cmd.find_local_opam_packages repo >>= fun local_packages ->
   build_config ~local_packages ~pull_mode ~opam_repo
   >>= fun config ->
+
+  (* Check the duniverse file for pins. *)
+  let duniverse_file = Fpath.(repo // Config.duniverse_file) in
+  Duniverse.load ~file:duniverse_file >>| read_pins >>= fun pins ->
+
   Opam_cmd.calculate_opam ~config ~local_opam_repo >>= fun packages ->
   Opam_cmd.report_packages_stats packages;
   let depext_pkgs =
@@ -60,7 +74,7 @@ let run (`Repo repo)
   Common.Logs.app (fun l -> l "Calculating Git repositories to vendor source code.");
   compute_deps ~opam_entries:packages >>= fun unresolved_deps ->
   resolve_ref unresolved_deps >>= fun deps ->
-  let duniverse = { Duniverse.config; deps; depexts } in
+  let duniverse = { Duniverse.config; pins; deps; depexts; } in
   let file = Fpath.(repo // Config.duniverse_file) in
   Duniverse.save ~file duniverse >>= fun () ->
   Common.Logs.app (fun l ->
