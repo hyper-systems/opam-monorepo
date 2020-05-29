@@ -1,6 +1,6 @@
 open Duniverse_lib
 
-let build_config ~local_packages ~pull_mode ~opam_repo =
+let build_config ~local_packages ~pins ~pull_mode ~opam_repo =
   let open Rresult.R.Infix in
   Opam_cmd.choose_root_packages ~local_packages >>= fun root_packages ->
   let ocaml_compilers =
@@ -12,12 +12,9 @@ let build_config ~local_packages ~pull_mode ~opam_repo =
   in
   let version = "1" in
   let root_packages =
-    root_packages
-    |> List.sort_uniq String.compare
-    |> List.map (fun path ->
-        let name = Filename.(remove_extension (basename path)) in
-        let package = { Types.Opam.name; version = None } in
-        (path, package))
+    List.map
+      (fun path -> (path, Opam_cmd.split_opam_name_and_version (Filename.basename path)))
+      (root_packages @ pins)
   in
   Ok { Duniverse.Config.version; root_packages; pull_mode; ocaml_compilers; opam_repo }
 
@@ -36,7 +33,7 @@ let resolve_ref deps =
   Duniverse.Deps.resolve ~resolve_ref deps
 
 let run (`Repo repo)
-    (`Opam_repo opam_repo) (`Pull_mode pull_mode) (`Opam_files opam_files) () =
+    (`Opam_repo opam_repo) (`Pull_mode pull_mode) () =
   let open Rresult.R.Infix in
   (match Cloner.get_cache_dir () with None -> Ok (Fpath.v ".") | Some t -> t) >>= fun cache_dir ->
   let local_opam_repo = Fpath.(cache_dir / "opam-repository.git") in
@@ -44,13 +41,9 @@ let run (`Repo repo)
   let opam_repo_branch = match Uri.fragment opam_repo with None -> "master" | Some b -> b in
   Exec.git_clone_or_pull ~remote:opam_repo_url ~branch:opam_repo_branch ~output_dir:local_opam_repo
   >>= fun () ->
-  let opam_files =
-    match opam_files with
-    | Some opam_files -> Ok opam_files
-    | None -> Opam_cmd.find_local_opam_packages repo
-  in
-  opam_files >>= fun local_packages ->
-  build_config ~local_packages ~pull_mode ~opam_repo
+  Opam_cmd.find_local_opam_files repo >>= fun local_packages ->
+  Opam_cmd.find_local_opam_files Fpath.(repo // Config.pins_dir) >>= fun pins ->
+  build_config ~local_packages ~pins ~pull_mode ~opam_repo
   >>= fun config ->
   Opam_cmd.calculate_opam ~config ~local_opam_repo >>= fun packages ->
   Opam_cmd.report_packages_stats packages;
@@ -116,6 +109,6 @@ let term =
   let open Term in
   term_result
     ( const run $ Common.Arg.repo $ opam_repo $ pull_mode
-    $ Common.Arg.opam_files $ Common.Arg.setup_logs () )
+    $ Common.Arg.setup_logs () )
 
 let cmd = (term, info)

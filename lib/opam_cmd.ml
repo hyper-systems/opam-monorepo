@@ -34,10 +34,13 @@ let strip_ext fname =
   let fname = if has_ext "tar" fname then rem_ext fname else fname in
   to_string fname
 
-let find_local_opam_packages dir =
+let find_local_opam_files dir =
+  Bos.OS.Dir.exists dir >>= fun exists ->
+  if not exists then Ok [] else
   Bos.OS.Dir.contents ~rel:true dir
   >>| List.filter (Fpath.has_ext ".opam")
-  >>| List.map Fpath.rem_ext >>| List.map Fpath.to_string
+  >>| List.map (Fpath.append dir)
+  >>| List.map Fpath.to_string
 
 let tag_from_archive archive =
   let uri = Uri.of_string archive in
