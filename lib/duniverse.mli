@@ -90,7 +90,8 @@ module Config : sig
 
   type t = {
     version: string;
-    root_packages : (string * Types.Opam.package) list;
+    root_packages : Types.Opam.package list;
+    pins : Types.Opam.pin list;
     pull_mode : pull_mode; [@default Submodules]
     opam_repo : Uri_sexp.t;
     ocaml_compilers : string list; [@default []]

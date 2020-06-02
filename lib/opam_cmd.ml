@@ -23,10 +23,11 @@ let pp_header = Fmt.(styled `Blue string)
 
 let header = "==> "
 
-let split_opam_name_and_version name =
+let package_of_filename path =
+  let name = Filename.(remove_extension (basename path)) in
   match String.cut ~sep:"." name with
-  | None -> { name; version = None }
-  | Some (name, version) -> { name; version = Some version }
+  | None -> { name; version = None; path }
+  | Some (name, version) -> { name; version = Some version; path }
 
 let strip_ext fname =
   let open Fpath in
@@ -135,7 +136,7 @@ let classify_package ~package ~dev_repo ~archive () =
             (kind, tag)
         | x -> (x, None) )
 
-let get_opam_depexts ~local_opam_repo { Types.Opam.package = { name; version }; path; _ } =
+let get_opam_depexts ~local_opam_repo { Types.Opam.package = { name; version; path }; _ } =
   let version = match version with None -> "dev" | Some v -> v in
   let opam_file =
     if Sys.file_exists path then Fpath.v path
@@ -146,17 +147,10 @@ let get_opam_depexts ~local_opam_repo { Types.Opam.package = { name; version }; 
   OpamFile.OPAM.depexts opam |>
   List.map (fun (s, f) -> (s, OpamFilter.to_string f))
 
-let get_opam_info ~opam_repo ~root_packages packages =
+let get_opam_info packages =
   List.map
-    (fun ({ name; version } as pkg) ->
-      let version =
-        match version with None -> failwith "must have package version" | Some v -> v
-      in
-      let opam_file =
-        match List.find_opt (fun (_, p) -> p.name = name) root_packages with
-        | Some (path, _) -> Fpath.v path
-        | None -> Fpath.(opam_repo / "packages" / name / (name ^ "." ^ version) / "opam")
-      in
+    (fun ({ path; _ } as pkg) ->
+      let opam_file = Fpath.v path in
       Logs.info (fun l -> l "processing %a" Fpath.pp opam_file);
       let open OpamParserTypes in
       OpamParser.file (Fpath.to_string opam_file) |> fun { file_contents; _ } ->
@@ -206,9 +200,8 @@ let get_opam_info ~opam_repo ~root_packages packages =
             pkg pp_repo dev_repo
             Fmt.(option string)
             tag);
-      { package = pkg; dev_repo; tag; is_dune; path = Fpath.to_string opam_file })
+        { package = pkg; dev_repo; tag; is_dune })
     packages
-  |> fun v -> Ok v
 
 (* TODO catch exceptions and turn to error *)
 
@@ -226,28 +219,24 @@ let filter_duniverse_packages pkgs =
   in
   fn [] pkgs
 
-let calculate_opam ~config ~local_opam_repo =
-  let { Duniverse.Config.root_packages; _ } = config in
-  Opam_solve.calculate ~opam_repo:local_opam_repo ~root_packages
-  >>| List.map OpamPackage.to_string
-  >>| List.map split_opam_name_and_version
-  >>= fun deps ->
-  let root_packages_without_path = List.map snd root_packages in
+let calculate_opam ~root_packages ~local_opam_repo =
+  Opam_solve.calculate ~opam_repo:local_opam_repo ~root_packages >>| fun deps ->
+  let deps = List.filter (fun _dep -> true) deps in
   Logs.app (fun l ->
       l "%aFound %a opam dependencies for %a." pp_header header
         Fmt.(styled `Green int)
         (List.length deps)
         Fmt.(list ~sep:(unit " ") Styled_pp.package)
-        root_packages_without_path);
+        root_packages);
   Logs.info (fun l ->
       l "The dependencies for %a are: %a"
         Fmt.(list ~sep:(unit ",@ ") pp_package)
-        root_packages_without_path
+        root_packages
         Fmt.(list ~sep:(unit ",@ ") pp_package)
         deps);
   Logs.app (fun l ->
       l "%aQuerying opam database for their metadata and Dune compatibility." pp_header header);
-  get_opam_info ~opam_repo:local_opam_repo ~root_packages deps
+  get_opam_info deps
 
 type packages_stats = { total : int; dune : int; not_dune : entry list }
 

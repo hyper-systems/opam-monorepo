@@ -2,9 +2,7 @@ open! Lwt.Infix
 
 let ( / ) = Filename.concat
 
-type package = OpamPackage.t
-
-type selection = { variant : string; packages : package list }
+type selection = { variant : string; packages : Types.Opam.package list }
 
 let with_dir path fn =
   let ch = Unix.opendir path in
@@ -135,17 +133,17 @@ let solve ~opam_repo ~root_packages ~variants =
   let opam_repository = Fpath.to_string opam_repo in
   let pkgs =
     root_packages
-    |> List.map (fun (path, package) ->
+    |> List.map (fun package ->
            let name =
              OpamPackage.Name.of_string (package.Types.Opam.name)
            in
            let version =
-             let dir = Filename.dirname path in
+             let dir = Filename.dirname package.path in
              match OpamPackage.of_string_opt dir with
              | Some { OpamPackage.version; _ } -> version
              | None -> dev
            in
-           (OpamPackage.create name version, path))
+           (OpamPackage.create name version, package.path))
   in
   let root_pkgs =
     pkgs
@@ -177,12 +175,25 @@ let solve ~opam_repo ~root_packages ~variants =
          match r with
          | Some sels ->
              (* Fmt.pr "Solve succeeded in %.2f s\n%!" (t1 -. t0); *)
-             let pkgs =
-               sels |> Solver.Output.to_map |> Solver.Output.RoleMap.to_seq |> List.of_seq
-               |> List.filter_map (fun (_role, sel) -> Input.version (Solver.Output.unwrap sel))
+             let packages =
+               sels
+               |> Solver.Output.to_map
+               |> Solver.Output.RoleMap.to_seq
+               |> Seq.filter_map (fun (_role, sel) -> Input.version (Solver.Output.unwrap sel))
+               |> Seq.filter_map (fun opam ->
+                   let name = OpamPackage.name_to_string opam in
+                   let version = OpamPackage.version_to_string opam in
+                   match List.find_opt (fun p -> p.Types.Opam.name = name) root_packages with
+                   | Some _ -> None
+                   | None ->
+                     let path =
+                       Fpath.(opam_repo / "packages" / name / (name ^ "." ^ version) / "opam")
+                       |> Fpath.to_string in
+                   Some { Types.Opam.name; version = Some version; path })
+               |> List.of_seq
              in
              (* Fmt.pr "-> @[<hov>%a@]" Fmt.(list ~sep:sp pp_sel) pkgs; *)
-             Lwt.return_some { variant = variant.id; packages = pkgs }
+             Lwt.return_some { variant = variant.id; packages }
          | None ->
              (* Fmt.pr "Eliminated all possibilities in %.2f s\n%!" (t1 -. t0); *)
              Lwt.return_none)

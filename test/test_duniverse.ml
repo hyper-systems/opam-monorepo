@@ -21,9 +21,12 @@ module Testable = struct
   end
 end
 
-let entry_factory ?(package = { Duniverse_lib.Types.Opam.name = ""; version = None })
-    ?(dev_repo = `Virtual) ?tag ?(is_dune = false) ?(path="") () =
-  { Duniverse_lib.Types.Opam.package; dev_repo; tag; is_dune; path }
+let entry_factory ?(package = { Duniverse_lib.Types.Opam.name = ""; version = None; path = "" })
+    ?(dev_repo = `Virtual) ?tag ?(is_dune = false) () =
+  { Duniverse_lib.Types.Opam.package; dev_repo; tag; is_dune}
+
+let make_package ?version ?(path="") name =
+  { Duniverse_lib.Types.Opam.name; version; path }
 
 module Deps = struct
   module Source = struct
@@ -152,14 +155,14 @@ module Deps = struct
         make_test ~name:"Non dune"
           ~entry:
             (entry_factory ~dev_repo:(`Git "") ~is_dune:false
-               ~package:{ name = "x"; version = Some "y" }
+               ~package:(make_package ~version:"y" "x")
                ())
           ~expected:(Ok (Some (Opam { name = "x"; version = Some "y" })))
           ();
         make_test ~name:"dune"
           ~entry:
             (entry_factory ~dev_repo:(`Git "x") ~is_dune:true
-               ~package:{ name = "y"; version = None } ~tag:"z" ())
+               ~package:(make_package "x") ~tag:"z" ())
           ~expected:
             (Ok (Some (Source { opam = { name = "y"; version = None }; upstream = "x"; ref = "z" })))
           ();
@@ -167,7 +170,7 @@ module Deps = struct
           ~get_default_branch:(function "x" -> Ok "z" | _ -> assert false)
           ~entry:
             (entry_factory ~dev_repo:(`Git "x") ~is_dune:true
-               ~package:{ name = "y"; version = None } ?tag:None ())
+               ~package:(make_package "y") ?tag:None ())
           ~expected:
             (Ok (Some (Source { opam = { name = "y"; version = None }; upstream = "x"; ref = "z" })))
           ();
@@ -197,9 +200,9 @@ module Deps = struct
         ~entries:
           [
             entry_factory
-              ~package:{ name = "x"; version = Some "v" }
+              ~package:(make_package ~version:"v" "x")
               ~dev_repo:(`Git "g") ~is_dune:false ();
-            entry_factory ~package:{ name = "y"; version = None } ~tag:"w" ~dev_repo:(`Git "h")
+            entry_factory ~package:(make_package "x") ~tag:"w" ~dev_repo:(`Git "h")
               ~is_dune:true ();
           ]
         ~expected:
@@ -220,10 +223,10 @@ module Deps = struct
       make_test ~name:"Aggregates repos"
         ~entries:
           [
-            entry_factory ~package:{ name = "y"; version = None } ~tag:"w" ~dev_repo:(`Git "h")
+            entry_factory ~package:(make_package "y") ~tag:"w" ~dev_repo:(`Git "h")
               ~is_dune:true ();
             entry_factory
-              ~package:{ name = "y-lwt"; version = None }
+              ~package:(make_package "y-lwt")
               ~tag:"w" ~dev_repo:(`Git "h") ~is_dune:true ();
           ]
         ~expected:

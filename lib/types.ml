@@ -38,6 +38,7 @@ module Opam = struct
   type package = {
     name : string;
     version : string option; [@default None] [@sexp_drop_default.sexp]
+    path : string;
   }
   [@@deriving sexp]
 
@@ -46,7 +47,6 @@ module Opam = struct
     dev_repo : repo;
     tag : string option; [@default None] [@sexp_drop_default.sexp]
     is_dune : bool; [@default true] [@sexp_drop_default.sexp]
-    path : string;
   }
   [@@deriving sexp]
 
