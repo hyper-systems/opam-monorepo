@@ -1,8 +1,12 @@
 open Duniverse_lib
 open Rresult
 
+let confirm_replace_pin name () =
+  Prompt.confirm_or_abort ~yes:false ~question:(fun l ->
+    l "A pin with name %a already exists, would you like to replace it?"
+      Fmt.(styled `Yellow string) name)
 
-let pin (`Pin_name to_add) (`Pin_uri uri) (`Repo repo) () =
+let pin (`Pin_name pin_name) (`Pin_uri uri) (`Repo repo) () =
   let file = Fpath.(repo // Config.duniverse_file) in
   Bos.OS.File.exists file >>= fun exists ->
   if not exists then
@@ -12,25 +16,27 @@ let pin (`Pin_name to_add) (`Pin_uri uri) (`Repo repo) () =
   else
     let tag = Uri.fragment uri in
     let uri = Uri.with_fragment uri None in
-    let pin = { Types.Opam.pin = to_add; url = Some (Uri.to_string uri); tag } in
+    let pin = { Types.Opam.pin = pin_name; url = Some (Uri.to_string uri); tag } in
     Duniverse.load ~file >>= fun duniverse ->
-    if List.exists (fun pin -> pin.Types.Opam.pin = to_add) duniverse.config.pins then
-      R.error_msgf "Could not add pin `%s` as this package already exists in %a."
-        to_add Fpath.pp (Fpath.normalize file)
-    else
-    let config = { duniverse.config with pins = pin :: duniverse.config.pins } in
+    begin
+      if List.exists (fun pin -> pin.Types.Opam.pin = pin_name) duniverse.config.pins then
+        confirm_replace_pin pin_name () >>= fun () ->
+        Ok (List.filter (fun pin -> pin.Types.Opam.pin <> pin_name) duniverse.config.pins)
+      else Ok duniverse.config.pins
+    end >>= fun pins ->
+    let config = { duniverse.config with pins = pin :: pins } in
     let duniverse = { duniverse with config } in
     Duniverse.save ~file duniverse >>= fun () ->
     Common.Logs.app (fun l ->
         l "Added pin %a to %a. You can now run %a to update the dependencies."
-          Fmt.(styled `Yellow string) to_add
+          Fmt.(styled `Yellow string) pin_name
           Styled_pp.path (Fpath.normalize file)
           Fmt.(styled `Blue string)
           "duniverse init");
     Ok ()
 
 
-let unpin (`Pin_name to_remove) (`Repo repo) () =
+let unpin (`Pin_name pin_name) (`Repo repo) () =
   let file = Fpath.(repo // Config.duniverse_file) in
   Bos.OS.File.exists file >>= fun exists ->
   if not exists then
@@ -40,17 +46,17 @@ let unpin (`Pin_name to_remove) (`Repo repo) () =
   else
     Duniverse.load ~file >>= fun duniverse ->
     let pins_len = List.length duniverse.config.pins in
-    let filtered = List.filter (fun pin -> pin.Types.Opam.pin <> to_remove) duniverse.config.pins in
+    let filtered = List.filter (fun pin -> pin.Types.Opam.pin <> pin_name) duniverse.config.pins in
     if pins_len = List.length filtered then
-      R.error_msgf "Could not find pin `%s` in %a." to_remove Fpath.pp (Fpath.normalize file)
+      R.error_msgf "Could not find pin `%s` in %a." pin_name Fpath.pp (Fpath.normalize file)
     else
       let config = { duniverse.config with pins = filtered } in
       let duniverse = { duniverse with config } in
       Duniverse.save ~file duniverse >>= fun () ->
-      Bos.OS.File.delete Fpath.(Config.pins_dir / (to_remove ^ ".opam")) >>= fun () ->
+      Bos.OS.File.delete Fpath.(Config.pins_dir / (pin_name ^ ".opam")) >>= fun () ->
       Common.Logs.app (fun l ->
           l "Removed pin %a from %a. You can now run %a to update the dependencies."
-            Fmt.(styled `Yellow string) to_remove
+            Fmt.(styled `Yellow string) pin_name
             Styled_pp.path (Fpath.normalize file)
             Fmt.(styled `Blue string)
             "duniverse init");
