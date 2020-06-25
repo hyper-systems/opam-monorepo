@@ -58,7 +58,7 @@ module Deps = struct
         pp_ref ref (list Opam.raw_pp) provided_packages
 
     let dir_name_from_package { Opam.name; version } =
-      Printf.sprintf "%s.%s" name (match version with None -> "zdev" | Some x -> x)
+      Printf.sprintf "%s.%s" name (match version with None -> "dev" | Some x -> x)
 
     let from_package { Package.opam; upstream; ref } =
       let dir = dir_name_from_package opam in
@@ -207,7 +207,7 @@ module Tools = struct
     let dune = Latest in (* TODO check for minimum in dune-project *)
     let odoc = Latest in (* No real version constraints on odoc *)
     let opam = Latest in (* No real version constraints on opam *)
-    let mdx = Latest in 
+    let mdx = Latest in
     let lsp = Latest in
     let merlin = Latest in
     { ocamlformat; dune; odoc; opam; mdx; lsp; merlin }
