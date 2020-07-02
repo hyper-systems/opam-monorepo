@@ -28,12 +28,13 @@ let pin (`Pin_name pin_name) (`Pin_uri uri) (`Repo repo) () =
     let duniverse = { duniverse with config } in
     Duniverse.save ~file duniverse >>= fun () ->
     Common.Logs.app (fun l ->
-        l "Added pin %a to %a. You can now run %a to update the dependencies."
+        l "Added pin %a to %a."
           Fmt.(styled `Yellow string) pin_name
-          Styled_pp.path (Fpath.normalize file)
-          Fmt.(styled `Blue string)
-          "duniverse init");
-    Ok ()
+          Styled_pp.path (Fpath.normalize file));
+    Common.Logs.app (fun l -> l "Updating dependencies...");
+    let opam_repo = duniverse.config.opam_repo in
+    let pull_mode = duniverse.config.pull_mode in
+    Init.run (`Repo repo) (`Opam_repo opam_repo) (`Pull_mode pull_mode) ()
 
 
 let unpin (`Pin_name pin_name) (`Repo repo) () =
@@ -55,12 +56,13 @@ let unpin (`Pin_name pin_name) (`Repo repo) () =
       Duniverse.save ~file duniverse >>= fun () ->
       Bos.OS.File.delete Fpath.(Config.pins_dir / (pin_name ^ ".opam")) >>= fun () ->
       Common.Logs.app (fun l ->
-          l "Removed pin %a from %a. You can now run %a to update the dependencies."
+          l "Removed pin %a from %a."
             Fmt.(styled `Yellow string) pin_name
-            Styled_pp.path (Fpath.normalize file)
-            Fmt.(styled `Blue string)
-            "duniverse init");
-      Ok ()
+            Styled_pp.path (Fpath.normalize file));
+    Common.Logs.app (fun l -> l "Updating dependencies...");
+    let opam_repo = duniverse.config.opam_repo in
+    let pull_mode = duniverse.config.pull_mode in
+    Init.run (`Repo repo) (`Opam_repo opam_repo) (`Pull_mode pull_mode) ()
 
 
 open Cmdliner
