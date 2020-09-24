@@ -97,9 +97,10 @@ let duniverse ~cache ~pull_mode ~repo duniverse =
   let duniverse_dir = Fpath.(repo // Config.vendor_dir) in
   Bos.OS.Dir.create duniverse_dir >>= fun _created ->
   mark_duniverse_content_as_vendored ~duniverse_dir >>= fun () ->
-  let sm = pull_mode = Duniverse.Config.Submodules in
-  pull_source_dependencies ~trim_clone:(not sm) ~duniverse_dir ~cache duniverse >>= fun () ->
-  if sm then set_git_submodules ~repo ~duniverse_dir duniverse else Ok ()
+  let trim_clone = pull_mode = Duniverse.Config.Source in
+  pull_source_dependencies ~trim_clone ~duniverse_dir ~cache duniverse >>= fun () ->
+  if pull_mode = Duniverse.Config.Submodules then
+    set_git_submodules ~repo ~duniverse_dir duniverse else Ok ()
 
 
 

@@ -97,14 +97,19 @@ open Cmdliner
 let pull_mode =
   let doc =
     "How to pull the sources. If $(i,submodules), the pull command will initialise them as git \
-     submodules.  If $(i,source) then the source code will directly be cloned to the source tree."
+     submodules.  If $(i,source) then the source code will directly be copied to the source tree.
+     If $(i,clone) then sources are cloned as git repositories (but not added as submodules)."
   in
   Common.Arg.named
     (fun x -> `Pull_mode x)
     Arg.(
       value
       & opt
-          (enum [ ("submodule", Duniverse.Config.Submodules); ("source", Duniverse.Config.Source) ])
+          (enum [
+            ("submodule", Duniverse.Config.Submodules);
+            ("clone", Duniverse.Config.Clone);
+            ("source", Duniverse.Config.Source)
+          ])
           Duniverse.Config.Source
       & info [ "pull-mode" ] ~docv:"PULL_MODE" ~doc)
 
