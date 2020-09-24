@@ -214,7 +214,7 @@ module Tools = struct
 end
 
 module Config = struct
-  type pull_mode = Submodules | Source [@@deriving sexp]
+  type pull_mode = Submodules | Clone | Source [@@deriving sexp]
 
   type t = {
     version: string;
